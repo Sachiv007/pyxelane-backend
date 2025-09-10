@@ -1,17 +1,20 @@
+# Ignore backend folder completely
+backend/
+
 # Node modules
 node_modules/
 
-# Logs
+# Log files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment variables
-.env
-
-# Build outputs (if any)
+# Build output
 dist/
 build/
+
+# Local env files
+.env
 
 # OS files
 .DS_Store
