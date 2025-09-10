@@ -1,5 +1,4 @@
-
-import cors from "cors";// CORS //
+import cors from "cors";
 import express from "express";
 import dotenv from "dotenv";
 dotenv.config();
@@ -30,18 +29,18 @@ const ALLOWED_ORIGINS = [
   "https://pyxelport-frontend.onrender.com",
 ];
 
+// 🔎 Request logger (see OPTIONS requests & origins)
+app.use((req, res, next) => {
+  console.log("📡 Request:", req.method, req.url, "Origin:", req.headers.origin);
+  next();
+});
+
 // Use a proper CORS middleware that always handles OPTIONS
 app.use(
   cors({
     origin: (origin, callback) => {
-      // ✅ Allow requests with no origin (Postman, curl, some browsers)
-      if (!origin) return callback(null, true);
-
-      // ✅ Explicitly allow your frontend
-      if (ALLOWED_ORIGINS.includes(origin)) {
-        return callback(null, true);
-      }
-
+      if (!origin) return callback(null, true); // Allow requests with no origin (Postman, curl, etc.)
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
       console.warn("❌ Blocked CORS origin:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
@@ -53,7 +52,7 @@ app.use(
   })
 );
 
-// Handle preflight requests for ALL routes
+// 🔑 Explicit OPTIONS handler for all routes
 app.options("*", cors());
 
 // ------------------------------
