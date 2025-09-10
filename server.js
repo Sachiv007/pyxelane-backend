@@ -20,7 +20,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ------------------------------
-// ✅ CORS (Frontend + Local Dev) - fixed for Render deployment
+// ✅ CORS (Frontend + Local Dev) - fully debugged
 // ------------------------------
 const ALLOWED_ORIGINS = [
   "http://localhost:5173",
@@ -29,30 +29,30 @@ const ALLOWED_ORIGINS = [
   "https://pyxelport-frontend.onrender.com",
 ];
 
-// 🔎 Request logger (see OPTIONS requests & origins)
+// 🔎 Log all requests for debugging
 app.use((req, res, next) => {
   console.log("📡 Request:", req.method, req.url, "Origin:", req.headers.origin);
   next();
 });
 
-// Use a proper CORS middleware that always handles OPTIONS
+// ✅ CORS middleware
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // Allow requests with no origin (Postman, curl, etc.)
+      if (!origin) return callback(null, true); // Postman, curl, etc.
       if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
       console.warn("❌ Blocked CORS origin:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     preflightContinue: false,
     optionsSuccessStatus: 204,
   })
 );
 
-// 🔑 Explicit OPTIONS handler for all routes
+// ✅ Explicitly handle OPTIONS preflight for all routes
 app.options("*", cors());
 
 // ------------------------------
@@ -121,7 +121,7 @@ app.post(
       return res.json({ imageUrl: publicData.publicUrl });
     } catch (err) {
       console.error("Upload error:", err);
-      return res.status(500).json({ error: "File upload failed" });
+      return res.status(500).json({ error: "File upload failed", details: err.message });
     }
   }
 );
@@ -191,101 +191,10 @@ app.post("/api/create-checkout-session", async (req, res) => {
     return res.json({ url: session.url, id: session.id });
   } catch (error) {
     console.error("Stripe error:", error);
-    return res
-      .status(500)
-      .json({ error: error.message || "Internal server error" });
-  }
-});
-
-// ------------------------------
-// Download Product
-// ------------------------------
-app.get("/api/download-product/:productId", async (req, res) => {
-  try {
-    const { productId } = req.params;
-    const { data: product, error: dbError } = await supabase
-      .from("products")
-      .select("file_path, title")
-      .eq("id", productId)
-      .maybeSingle();
-
-    if (dbError || !product?.file_path)
-      return res.status(404).send("Product not found.");
-
-    const filePath = product.file_path.trim();
-    const { data: signedUrlData, error } = await supabase.storage
-      .from(PRODUCTS_BUCKET)
-      .createSignedUrl(filePath, 60 * 60);
-
-    if (error || !signedUrlData?.signedUrl)
-      return res.status(500).send("Failed to generate download link.");
-
-    const fileResponse = await fetch(signedUrlData.signedUrl);
-    const fileBuffer = await fileResponse.buffer();
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${product.title || productId}${path.extname(filePath)}"`
-    );
-    res.setHeader("Content-Type", "application/octet-stream");
-
-    return res.send(fileBuffer);
-  } catch (err) {
-    console.error("Download error:", err);
-    return res.status(500).send("Failed to download product.");
-  }
-});
-
-// ------------------------------
-// Send Receipt Email
-// ------------------------------
-app.post("/api/send-receipt", async (req, res) => {
-  try {
-    const { buyerEmail, productId } = req.body;
-    if (!buyerEmail || !productId)
-      return res.status(400).json({ error: "Missing email or productId" });
-
-    const { data: product, error: productError } = await supabase
-      .from("products")
-      .select("file_path, title, price")
-      .eq("id", productId)
-      .maybeSingle();
-
-    if (productError || !product?.file_path)
-      return res.status(404).json({ error: "Product not found" });
-
-    const { data: signedUrlData, error: signedError } = await supabase.storage
-      .from(PRODUCTS_BUCKET)
-      .createSignedUrl(product.file_path, 60 * 60 * 24);
-
-    if (signedError || !signedUrlData?.signedUrl)
-      return res.status(500).json({ error: "Failed to generate download link" });
-
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
-      port: process.env.SMTP_PORT || 587,
-      secure: false,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    return res.status(500).json({
+      error: error.message || "Internal server error",
+      stack: error.stack, // ✅ show stacktrace for debugging
     });
-
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `"My Store" <${process.env.SMTP_USER}>`,
-      to: buyerEmail,
-      subject: "Your Purchase Receipt & Download Link",
-      html: `
-        <h2>Thank you for your purchase!</h2>
-        <p>You bought <strong>${product.title}</strong> for $${product.price}.</p>
-        <a href="${signedUrlData.signedUrl}" style="display:inline-block;padding:10px 20px;margin:10px 0;
-        background-color:#16a34a;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Download Product</a>
-        <p>This link will expire in 24 hours.</p>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-    return res.json({ success: true, message: "Email sent" });
-  } catch (err) {
-    console.error("Email error:", err);
-    return res.status(500).json({ error: "Failed to send receipt email" });
   }
 });
 
