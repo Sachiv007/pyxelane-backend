@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import Stripe from "stripe";
-import fetch from "node-fetch"; // npm install node-fetch
+import fetch from "node-fetch";
 import nodemailer from "nodemailer";
 
 dotenv.config();
@@ -21,14 +21,12 @@ const PORT = process.env.PORT || 5000;
 // ===============================
 // Middleware
 // ===============================
-// During testing, allow all origins to prevent CORS issues
-app.use(
-  cors({
-    origin: "*",
-    credentials: true,
-  })
-);
+// ⚡ Open CORS for all origins (good for testing)
+app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
+
+// Serve static files from any folder if needed
+app.use(express.static(path.join(__dirname, "public")));
 
 // ===============================
 // Supabase client
@@ -36,7 +34,6 @@ app.use(express.json());
 const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(process.env.SUPABASE_URL, supabaseKey);
-
 const PRODUCTS_BUCKET = "products-files";
 
 // ===============================
@@ -51,7 +48,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // ===============================
-// Safe filename generator
+// Helper: Safe filename
 // ===============================
 function safeFileName(originalName) {
   const timestamp = Date.now();
@@ -60,6 +57,13 @@ function safeFileName(originalName) {
   const safeBase = base.replace(/[^a-zA-Z0-9-_]/g, "_");
   return `${timestamp}-${safeBase}${ext}`;
 }
+
+// ===============================
+// Root / Health Check
+// ===============================
+app.get("/", (req, res) => {
+  res.send("✅ Pyxelane Backend is running!");
+});
 
 // ===============================
 // Upload Profile Picture
@@ -80,8 +84,7 @@ app.post(
           upsert: false,
         });
 
-      if (uploadError)
-        return res.status(500).json({ error: uploadError.message });
+      if (uploadError) return res.status(500).json({ error: uploadError.message });
 
       const { data: publicData } = supabase.storage
         .from("profile-pictures")
@@ -103,9 +106,8 @@ app.post("/api/create-checkout-session", async (req, res) => {
     const { cartItems, cart, email } = req.body;
     const items = cartItems || cart;
 
-    if (!items || items.length === 0) {
+    if (!items || items.length === 0)
       return res.status(400).json({ error: "Cart is empty" });
-    }
 
     const ids = items.map((it) => it.id).filter(Boolean);
     let priceById = {};
@@ -116,9 +118,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
         .in("id", ids);
 
       if (!dbErr) {
-        for (const r of rows || []) {
-          priceById[r.id] = Number(r.price);
-        }
+        for (const r of rows || []) priceById[r.id] = Number(r.price);
       }
     }
 
@@ -141,9 +141,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
       const productImages = item.image_url ? [item.image_url] : [];
 
       if (!cents) {
-        throw new Error(
-          `Invalid price for item "${productName}". Got ${priceDollars}`
-        );
+        throw new Error(`Invalid price for item "${productName}". Got ${priceDollars}`);
       }
 
       return {
@@ -187,28 +185,21 @@ app.get("/api/download-product/:productId", async (req, res) => {
       .eq("id", productId)
       .maybeSingle();
 
-    if (dbError || !product?.file_path) {
-      return res.status(404).send("Product not found.");
-    }
-
-    const filePath = product.file_path.trim();
+    if (dbError || !product?.file_path) return res.status(404).send("Product not found.");
 
     const { data: signedUrlData, error } = await supabase.storage
       .from(PRODUCTS_BUCKET)
-      .createSignedUrl(filePath, 60 * 60);
+      .createSignedUrl(product.file_path, 60 * 60);
 
-    if (error || !signedUrlData?.signedUrl) {
+    if (error || !signedUrlData?.signedUrl)
       return res.status(500).send("Failed to generate download link.");
-    }
 
     const fileResponse = await fetch(signedUrlData.signedUrl);
     const fileBuffer = await fileResponse.buffer();
 
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${product.title || productId}${path.extname(
-        filePath
-      )}"`
+      `attachment; filename="${product.title || productId}${path.extname(product.file_path)}"`
     );
     res.setHeader("Content-Type", "application/octet-stream");
     return res.send(fileBuffer);
@@ -225,9 +216,7 @@ app.post("/api/send-receipt", async (req, res) => {
   try {
     const { buyerEmail, productId } = req.body;
 
-    if (!buyerEmail || !productId) {
-      return res.status(400).json({ error: "Missing email or productId" });
-    }
+    if (!buyerEmail || !productId) return res.status(400).json({ error: "Missing email or productId" });
 
     const { data: product, error: productError } = await supabase
       .from("products")
@@ -235,22 +224,17 @@ app.post("/api/send-receipt", async (req, res) => {
       .eq("id", productId)
       .maybeSingle();
 
-    if (productError || !product?.file_path) {
-      return res.status(404).json({ error: "Product not found" });
-    }
+    if (productError || !product?.file_path) return res.status(404).json({ error: "Product not found" });
 
-    const { data: signedUrlData, error: signedError } =
-      await supabase.storage
-        .from(PRODUCTS_BUCKET)
-        .createSignedUrl(product.file_path, 60 * 60 * 24);
+    const { data: signedUrlData, error: signedError } = await supabase.storage
+      .from(PRODUCTS_BUCKET)
+      .createSignedUrl(product.file_path, 60 * 60 * 24);
 
-    if (signedError || !signedUrlData?.signedUrl) {
-      return res.status(500).json({ error: "Failed to generate download link" });
-    }
+    if (signedError || !signedUrlData?.signedUrl) return res.status(500).json({ error: "Failed to generate download link" });
 
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
-      port: process.env.SMTP_PORT || 587,
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
       secure: false,
       auth: {
         user: process.env.SMTP_USER,
@@ -259,7 +243,7 @@ app.post("/api/send-receipt", async (req, res) => {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || `"My Store" <${process.env.SMTP_USER}>`,
+      from: process.env.EMAIL_FROM || `"Pyxelane" <${process.env.SMTP_USER}>`,
       to: buyerEmail,
       subject: "Your Purchase Receipt & Download Link",
       html: `
@@ -288,10 +272,10 @@ app.post("/api/send-receipt", async (req, res) => {
 // ===============================
 // Start Server
 // ===============================
-app.listen(PORT, () =>
+app.listen(PORT, () => {
   console.log(
     `✅ Server running on port ${PORT} | Supabase key used: ${
       process.env.SUPABASE_SERVICE_ROLE_KEY ? "SERVICE_ROLE" : "ANON"
     }`
-  )
-);
+  );
+});
