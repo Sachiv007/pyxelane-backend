@@ -1,44 +1,56 @@
 {
-  "name": "digital-seller",
-  "private": true,
-  "version": "0.0.0",
+  
+  "name": "backend",
+  
   "type": "module",
+  
+  "version": "1.0.0",
+  
+  "description": "",
+  
+  "main": "index.js",
+  
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+  
+    
+  "test": "echo \"Error: no test specified\" && exit 1"
+  
   },
-  "dependencies": {
-    "@stripe/stripe-js": "^7.8.0",
-    "@supabase/supabase-js": "^2.54.0",
-    "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.17.1",
-    "multer": "^2.0.2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-easy-crop": "^5.5.0",
-    "react-router-dom": "^7.7.1",
-    "resend": "^6.0.2"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.30.1",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react-swc": "^3.10.2",
-    "eslint": "^9.30.1",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "globals": "^16.3.0",
-    "vite": "^7.0.4"
-  },
-  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
-  "main": "eslint.config.js",
+  
   "keywords": [],
+  
   "author": "",
-  "license": "ISC"
+  
+  "license": "ISC",
+  
+  "dependencies": {
+  
+    
+  "@supabase/supabase-js": "^2.54.0",
+  
+    
+  "archiver": "^7.0.1",
+  
+    
+  "cors": "^2.8.5",
+  
+    
+  "dotenv": "^17.2.1",
+  
+    
+  "express": "^5.1.0",
+  
+    
+  "multer": "^2.0.2",
+  
+    
+  "node-fetch": "^3.3.2",
+  
+    
+  "nodemailer": "^7.0.6",
+  
+    
+  "stripe": "^18.4.0"
+  
+  }
 }
