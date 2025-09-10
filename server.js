@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import cors from "cors";
+import cors from "cors";// CORS //
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -34,15 +34,22 @@ const ALLOWED_ORIGINS = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (curl, Postman, some Render requests)
+      // ✅ Allow requests with no origin (Postman, curl, some browsers)
       if (!origin) return callback(null, true);
-      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+
+      // ✅ Explicitly allow your frontend
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+
       console.warn("❌ Blocked CORS origin:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
 
