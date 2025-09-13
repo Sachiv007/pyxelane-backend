@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 import Stripe from "stripe";
 import fetch from "node-fetch";
 import nodemailer from "nodemailer";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -54,6 +55,19 @@ function safeFileName(originalName) {
   const safeBase = base.replace(/[^a-zA-Z0-9-_]/g, "_");
   return `${timestamp}-${safeBase}${ext}`;
 }
+
+// ===============================
+// Email Transporter
+// ===============================
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "mail.privateemail.com",
+  port: Number(process.env.SMTP_PORT) || 465,
+  secure: true, // SSL/TLS
+  auth: {
+    user: process.env.SMTP_USER || "info@pyxelane.com",
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 // ===============================
 // Root / Health Check
@@ -229,16 +243,6 @@ app.post("/api/send-receipt", async (req, res) => {
 
     if (signedError || !signedUrlData?.signedUrl) return res.status(500).json({ error: "Failed to generate download link" });
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "mail.privateemail.com",
-      port: Number(process.env.SMTP_PORT) || 465,
-      secure: true, // SSL/TLS
-      auth: {
-        user: process.env.SMTP_USER || "info@pyxelane.com",
-        pass: process.env.SMTP_PASS,
-      },
-    });
-
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"Pyxelane" <info@pyxelane.com>`,
       to: buyerEmail,
@@ -263,6 +267,92 @@ app.post("/api/send-receipt", async (req, res) => {
   } catch (err) {
     console.error("Email send error:", err);
     return res.status(500).json({ error: "Failed to send receipt email" });
+  }
+});
+
+// ===============================
+// Request Password Reset (Custom)
+// ===============================
+app.post("/api/request-password-reset", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+
+    // Find user
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (userError || !user) return res.status(404).json({ error: "User not found" });
+
+    // Create reset token
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+
+    await supabase.from("password_reset_tokens").insert({
+      user_id: user.id,
+      token,
+      expires_at: expiresAt.toISOString(),
+    });
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    await transporter.sendMail({
+      from: `"Pyxelane" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Password Reset Request",
+      html: `
+        <h2>Password Reset</h2>
+        <p>Click below to reset your password:</p>
+        <a href="${resetUrl}"
+           style="display:inline-block;padding:10px 20px;background:#2563eb;
+                  color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+          Reset Password
+        </a>
+        <p>This link will expire in 1 hour.</p>
+      `,
+    });
+
+    return res.json({ success: true, message: "Password reset email sent" });
+  } catch (err) {
+    console.error("Password reset error:", err);
+    return res.status(500).json({ error: "Failed to send reset email" });
+  }
+});
+
+// ===============================
+// Reset Password (Custom)
+// ===============================
+app.post("/api/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: "Missing data" });
+
+    const { data: resetData, error: resetError } = await supabase
+      .from("password_reset_tokens")
+      .select("user_id, expires_at")
+      .eq("token", token)
+      .maybeSingle();
+
+    if (resetError || !resetData) return res.status(400).json({ error: "Invalid token" });
+
+    if (new Date(resetData.expires_at) < new Date())
+      return res.status(400).json({ error: "Token expired" });
+
+    // Update password via Supabase Admin
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
+      resetData.user_id,
+      { password: newPassword }
+    );
+
+    if (updateError) return res.status(500).json({ error: "Failed to update password" });
+
+    return res.json({ success: true, message: "Password updated successfully" });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    return res.status(500).json({ error: "Failed to reset password" });
   }
 });
 
