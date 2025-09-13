@@ -21,11 +21,8 @@ const PORT = process.env.PORT || 5000;
 // ===============================
 // Middleware
 // ===============================
-// ⚡ Open CORS for all origins (good for testing)
 app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
-
-// Serve static files from any folder if needed
 app.use(express.static(path.join(__dirname, "public")));
 
 // ===============================
@@ -233,17 +230,17 @@ app.post("/api/send-receipt", async (req, res) => {
     if (signedError || !signedUrlData?.signedUrl) return res.status(500).json({ error: "Failed to generate download link" });
 
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      secure: false,
+      host: process.env.SMTP_HOST || "mail.privateemail.com",
+      port: Number(process.env.SMTP_PORT) || 465,
+      secure: true, // SSL/TLS
       auth: {
-        user: process.env.SMTP_USER,
+        user: process.env.SMTP_USER || "info@pyxelane.com",
         pass: process.env.SMTP_PASS,
       },
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || `"Pyxelane" <${process.env.SMTP_USER}>`,
+      from: process.env.EMAIL_FROM || `"Pyxelane" <info@pyxelane.com>`,
       to: buyerEmail,
       subject: "Your Purchase Receipt & Download Link",
       html: `
