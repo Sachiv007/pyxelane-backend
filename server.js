@@ -95,7 +95,8 @@ app.post(
           upsert: false,
         });
 
-      if (uploadError) return res.status(500).json({ error: uploadError.message });
+      if (uploadError)
+        return res.status(500).json({ error: uploadError.message });
 
       const { data: publicData } = supabase.storage
         .from("profile-pictures")
@@ -152,7 +153,9 @@ app.post("/api/create-checkout-session", async (req, res) => {
       const productImages = item.image_url ? [item.image_url] : [];
 
       if (!cents) {
-        throw new Error(`Invalid price for item "${productName}". Got ${priceDollars}`);
+        throw new Error(
+          `Invalid price for item "${productName}". Got ${priceDollars}`
+        );
       }
 
       return {
@@ -170,10 +173,14 @@ app.post("/api/create-checkout-session", async (req, res) => {
       customer_email: email || undefined,
       line_items,
       mode: "payment",
-      success_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/thank-you/${items[0].id}?session_id={CHECKOUT_SESSION_ID}&email=${encodeURIComponent(
+      success_url: `${
+        process.env.FRONTEND_URL || "http://localhost:5173"
+      }/thank-you/${items[0].id}?session_id={CHECKOUT_SESSION_ID}&email=${encodeURIComponent(
         email || ""
       )}`,
-      cancel_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/cart`,
+      cancel_url: `${
+        process.env.FRONTEND_URL || "http://localhost:5173"
+      }/cart`,
     });
 
     return res.json({ url: session.url, id: session.id });
@@ -196,7 +203,8 @@ app.get("/api/download-product/:productId", async (req, res) => {
       .eq("id", productId)
       .maybeSingle();
 
-    if (dbError || !product?.file_path) return res.status(404).send("Product not found.");
+    if (dbError || !product?.file_path)
+      return res.status(404).send("Product not found.");
 
     const { data: signedUrlData, error } = await supabase.storage
       .from(PRODUCTS_BUCKET)
@@ -210,7 +218,9 @@ app.get("/api/download-product/:productId", async (req, res) => {
 
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${product.title || productId}${path.extname(product.file_path)}"`
+      `attachment; filename="${
+        product.title || productId
+      }${path.extname(product.file_path)}"`
     );
     res.setHeader("Content-Type", "application/octet-stream");
     return res.send(fileBuffer);
@@ -227,7 +237,8 @@ app.post("/api/send-receipt", async (req, res) => {
   try {
     const { buyerEmail, productId } = req.body;
 
-    if (!buyerEmail || !productId) return res.status(400).json({ error: "Missing email or productId" });
+    if (!buyerEmail || !productId)
+      return res.status(400).json({ error: "Missing email or productId" });
 
     const { data: product, error: productError } = await supabase
       .from("products")
@@ -235,13 +246,17 @@ app.post("/api/send-receipt", async (req, res) => {
       .eq("id", productId)
       .maybeSingle();
 
-    if (productError || !product?.file_path) return res.status(404).json({ error: "Product not found" });
+    if (productError || !product?.file_path)
+      return res.status(404).json({ error: "Product not found" });
 
     const { data: signedUrlData, error: signedError } = await supabase.storage
       .from(PRODUCTS_BUCKET)
       .createSignedUrl(product.file_path, 60 * 60 * 24);
 
-    if (signedError || !signedUrlData?.signedUrl) return res.status(500).json({ error: "Failed to generate download link" });
+    if (signedError || !signedUrlData?.signedUrl)
+      return res
+        .status(500)
+        .json({ error: "Failed to generate download link" });
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"Pyxelane" <info@pyxelane.com>`,
@@ -285,7 +300,8 @@ app.post("/api/request-password-reset", async (req, res) => {
       .eq("email", email)
       .maybeSingle();
 
-    if (userError || !user) return res.status(404).json({ error: "User not found" });
+    if (userError || !user)
+      return res.status(404).json({ error: "User not found" });
 
     // Create reset token
     const token = crypto.randomBytes(32).toString("hex");
@@ -312,6 +328,7 @@ app.post("/api/request-password-reset", async (req, res) => {
           Reset Password
         </a>
         <p>This link will expire in 1 hour.</p>
+        <p>If you don’t see this email, please check your <strong>Spam or Promotions</strong> folder.</p>
       `,
     });
 
@@ -328,7 +345,8 @@ app.post("/api/request-password-reset", async (req, res) => {
 app.post("/api/reset-password", async (req, res) => {
   try {
     const { token, newPassword } = req.body;
-    if (!token || !newPassword) return res.status(400).json({ error: "Missing data" });
+    if (!token || !newPassword)
+      return res.status(400).json({ error: "Missing data" });
 
     const { data: resetData, error: resetError } = await supabase
       .from("password_reset_tokens")
@@ -336,7 +354,8 @@ app.post("/api/reset-password", async (req, res) => {
       .eq("token", token)
       .maybeSingle();
 
-    if (resetError || !resetData) return res.status(400).json({ error: "Invalid token" });
+    if (resetError || !resetData)
+      return res.status(400).json({ error: "Invalid token" });
 
     if (new Date(resetData.expires_at) < new Date())
       return res.status(400).json({ error: "Token expired" });
@@ -347,7 +366,8 @@ app.post("/api/reset-password", async (req, res) => {
       { password: newPassword }
     );
 
-    if (updateError) return res.status(500).json({ error: "Failed to update password" });
+    if (updateError)
+      return res.status(500).json({ error: "Failed to update password" });
 
     return res.json({ success: true, message: "Password updated successfully" });
   } catch (err) {
